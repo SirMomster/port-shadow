@@ -31,6 +31,13 @@ thiserror = "1"
 # Signal handling
 tokio-util = "0.7"
 
+# TUI
+ratatui = "0.29"
+crossterm = { version = "0.28", features = ["event-stream"] }
+
+# Ring buffer for log lines
+circular-buffer = "0.1"
+
 [target.'cfg(unix)'.dependencies]
 # Unix-specific: nothing extra needed, std has what we need
 

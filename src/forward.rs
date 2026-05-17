@@ -159,8 +159,8 @@ impl ForwardManager {
     }
 
     /// Checks if any previously-active forwards have had their SSH process die
-    /// unexpectedly, and removes them from the active set.
-    pub async fn reap_dead_forwards(&mut self) {
+    /// unexpectedly, removes them from the active set, and returns their ports.
+    pub async fn reap_dead_forwards(&mut self) -> Vec<u16> {
         let mut dead: Vec<u16> = Vec::new();
         for (port, fwd) in self.active.iter_mut() {
             match fwd.process.try_wait() {
@@ -179,9 +179,10 @@ impl ForwardManager {
                 }
             }
         }
-        for port in dead {
-            self.active.remove(&port);
+        for port in &dead {
+            self.active.remove(port);
         }
+        dead
     }
 }
 
