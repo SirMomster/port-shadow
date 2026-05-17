@@ -22,8 +22,7 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     // ------------------------------------------------------------------
-    // Logging: write to a file instead of stdout so the TUI isn't clobbered.
-    // Use RUST_LOG=port_shadow=debug to control level.
+    // Logging setup
     // ------------------------------------------------------------------
     let level = match cli.verbose {
         0 => "info",
@@ -33,18 +32,26 @@ async fn main() -> anyhow::Result<()> {
     let filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new(format!("port_shadow={level}")));
 
-    // Write tracing output to a log file so it doesn't collide with the TUI
-    let log_file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("port-shadow.log")
-        .ok();
+    if cli.tui {
+        // Write tracing output to a log file so it doesn't collide with the TUI.
+        // Use RUST_LOG=port_shadow=debug to control level.
+        let log_file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("port-shadow.log")
+            .ok();
 
-    if let Some(file) = log_file {
+        if let Some(file) = log_file {
+            fmt()
+                .with_env_filter(filter)
+                .with_target(false)
+                .with_writer(file)
+                .init();
+        }
+    } else {
         fmt()
             .with_env_filter(filter)
             .with_target(false)
-            .with_writer(file)
             .init();
     }
 
@@ -92,7 +99,7 @@ async fn main() -> anyhow::Result<()> {
     let extra_args = cfg.ssh.extra_args.clone();
 
     // ------------------------------------------------------------------
-    // Channel connecting polling loop → TUI
+    // Channel connecting polling loop → TUI / log consumer
     // ------------------------------------------------------------------
     let (tx, rx) = mpsc::unbounded_channel::<AppEvent>();
 
@@ -134,9 +141,13 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // ------------------------------------------------------------------
-    // Run the TUI in the main task (it owns the terminal)
+    // Run the TUI or plain log consumer in the main task
     // ------------------------------------------------------------------
-    tui::run_tui(rx, host).await?;
+    if cli.tui {
+        tui::run_tui(rx, host).await?;
+    } else {
+        run_log_consumer(rx).await;
+    }
 
     // Signal the polling loop to stop by dropping the sender;
     // the spawned task will exit when it tries to send on a closed channel.
@@ -145,8 +156,53 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Consume AppEvents and print them as plain log lines (no TUI).
+async fn run_log_consumer(mut rx: mpsc::UnboundedReceiver<AppEvent>) {
+    use tracing::{error, info, warn};
+    while let Some(event) = rx.recv().await {
+        match event {
+            AppEvent::Log { level, message } => match level {
+                LogLevel::Error => error!("{}", message),
+                LogLevel::Warn => warn!("{}", message),
+                LogLevel::Info => info!("{}", message),
+            },
+            AppEvent::PollOk { discovered } => {
+                info!("poll ok: {} port(s) discovered", discovered);
+            }
+            AppEvent::PollError { message } => {
+                error!("poll error: {}", message);
+            }
+            AppEvent::ForwardStarted {
+                remote_port,
+                local_port,
+                label,
+            } => {
+                let tag = label.as_deref().unwrap_or("");
+                if tag.is_empty() {
+                    info!("forward started: :{} -> :{}", remote_port, local_port);
+                } else {
+                    info!(
+                        "forward started: :{} -> :{} ({})",
+                        remote_port, local_port, tag
+                    );
+                }
+            }
+            AppEvent::ForwardStopped {
+                remote_port,
+                reason,
+            } => {
+                info!("forward stopped: :{} — {}", remote_port, reason);
+            }
+            AppEvent::ForwardDied { remote_port } => {
+                warn!("forward died: :{}", remote_port);
+            }
+            AppEvent::Shutdown => break,
+        }
+    }
+}
+
 /// The main polling loop. Sends `AppEvent`s through `tx` and exits
-/// when the sender is dropped (TUI quit).
+/// when the sender is dropped (TUI/consumer quit).
 async fn run_poll_loop(
     host: String,
     ssh_port: u16,
@@ -164,7 +220,7 @@ async fn run_poll_loop(
     loop {
         interval.tick().await;
 
-        // Check if TUI has quit
+        // Check if consumer has quit
         if tx.is_closed() {
             manager.teardown_all().await;
             return;

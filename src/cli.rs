@@ -42,4 +42,9 @@ pub struct Cli {
     /// Log verbosity. Use multiple times for more detail (-v, -vv, -vvv).
     #[arg(long, short = 'v', action = clap::ArgAction::Count)]
     pub verbose: u8,
+
+    /// Enable the terminal user interface. Without this flag, events are
+    /// printed as plain log lines to stdout.
+    #[arg(long)]
+    pub tui: bool,
 }
