@@ -363,14 +363,7 @@ async fn run_poll_loop(
             };
 
             match manager
-                .start_forward(
-                    &host,
-                    ssh_port,
-                    &extra_args,
-                    rport,
-                    local_port,
-                    None,
-                )
+                .start_forward(&host, ssh_port, &extra_args, rport, local_port, None)
                 .await
             {
                 Ok(()) => {
