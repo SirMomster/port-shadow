@@ -120,7 +120,7 @@ impl ForwardManager {
             "spawning ssh -L process"
         );
 
-        let process = tokio::process::Command::new("ssh")
+        let mut process = tokio::process::Command::new("ssh")
             .args(&args)
             // Don't inherit stdin so it can't accidentally grab terminal input
             .stdin(std::process::Stdio::null())
@@ -128,6 +128,29 @@ impl ForwardManager {
             .stderr(std::process::Stdio::piped())
             .spawn()
             .with_context(|| format!("failed to spawn ssh -L for port {remote_port}"))?;
+
+        // Give ssh a moment to fail fast (auth error, bad host, etc.) so we
+        // can surface the error immediately rather than on the next poll tick.
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        if let Ok(Some(status)) = process.try_wait() {
+            let stderr = if let Some(mut s) = process.stderr.take() {
+                use tokio::io::AsyncReadExt;
+                let mut buf = String::new();
+                let _ = s.read_to_string(&mut buf).await;
+                buf
+            } else {
+                String::new()
+            };
+            let msg = stderr.trim();
+            anyhow::bail!(
+                "ssh -L exited immediately with {status}{}",
+                if msg.is_empty() {
+                    String::new()
+                } else {
+                    format!(": {msg}")
+                }
+            );
+        }
 
         tracing::info!(
             remote_port,
