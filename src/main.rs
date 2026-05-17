@@ -105,8 +105,8 @@ async fn main() -> anyhow::Result<()> {
 
     if cfg.ports.is_empty() {
         let _ = tx.send(AppEvent::Log {
-            level: LogLevel::Warn,
-            message: "no [[ports]] in .port-shadow.toml — nothing to forward".into(),
+            level: LogLevel::Info,
+            message: "no [[ports]] in config — auto-discovering new ports on the remote".into(),
         });
     }
 
@@ -203,6 +203,17 @@ async fn run_log_consumer(mut rx: mpsc::UnboundedReceiver<AppEvent>) {
 
 /// The main polling loop. Sends `AppEvent`s through `tx` and exits
 /// when the sender is dropped (TUI/consumer quit).
+///
+/// Two forwarding modes run simultaneously:
+///
+/// 1. **Explicit** – ports listed in `[[ports]]` are forwarded whenever they
+///    appear on the remote, exactly as before.
+///
+/// 2. **Auto-discovery** – on the first successful poll the current set of
+///    remote ports is recorded as the *baseline*. Any port that appears in a
+///    later poll but was not in the baseline (and is not excluded or already
+///    managed) is automatically forwarded.  When it disappears the tunnel is
+///    torn down.
 async fn run_poll_loop(
     host: String,
     ssh_port: u16,
@@ -216,6 +227,10 @@ async fn run_poll_loop(
     let mut manager = ForwardManager::new();
     let mut interval = tokio::time::interval(poll_interval);
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+
+    // Ports that existed on the first successful poll – we don't forward these
+    // automatically; only ports that *appear after* the baseline are forwarded.
+    let mut baseline: Option<HashSet<u16>> = None;
 
     loop {
         interval.tick().await;
@@ -255,6 +270,21 @@ async fn run_poll_loop(
             }
         };
 
+        // -----------------------------------------------------------------
+        // First successful poll: record baseline
+        // -----------------------------------------------------------------
+        if baseline.is_none() {
+            tracing::info!(
+                count = remote_listening.len(),
+                "baseline snapshot recorded; new ports appearing after this will be auto-forwarded"
+            );
+            baseline = Some(remote_listening.clone());
+        }
+        let baseline_ports = baseline.as_ref().unwrap();
+
+        // -----------------------------------------------------------------
+        // Explicit forwards (from [[ports]] config)
+        // -----------------------------------------------------------------
         let configured_ports: HashSet<u16> = cfg
             .ports
             .iter()
@@ -262,7 +292,6 @@ async fn run_poll_loop(
             .filter(|p| !excluded.contains(p))
             .collect();
 
-        // Start forwards for newly-listening configured ports
         for mapping in &cfg.ports {
             let rport = mapping.remote_port;
             if excluded.contains(&rport) || !remote_listening.contains(&rport) {
@@ -312,7 +341,62 @@ async fn run_poll_loop(
             }
         }
 
-        // Tear down forwards that stopped listening or were removed from config
+        // -----------------------------------------------------------------
+        // Auto-discovery forwards (ports that appeared after the baseline)
+        // -----------------------------------------------------------------
+        for &rport in &remote_listening {
+            // Skip if excluded, in baseline, already configured explicitly,
+            // or already managed
+            if excluded.contains(&rport)
+                || baseline_ports.contains(&rport)
+                || configured_ports.contains(&rport)
+                || manager.is_active(rport)
+            {
+                continue;
+            }
+
+            let local_port = match resolve_local_port(rport).await {
+                Ok(p) => p,
+                Err(e) => {
+                    let _ = tx.send(AppEvent::Log {
+                        level: LogLevel::Error,
+                        message: format!("cannot resolve local port for :{rport}: {e}"),
+                    });
+                    continue;
+                }
+            };
+
+            match manager
+                .start_forward(
+                    &host,
+                    ssh_port,
+                    control_path.as_deref(),
+                    &extra_args,
+                    rport,
+                    local_port,
+                    None,
+                )
+                .await
+            {
+                Ok(()) => {
+                    let _ = tx.send(AppEvent::ForwardStarted {
+                        remote_port: rport,
+                        local_port,
+                        label: None,
+                    });
+                }
+                Err(e) => {
+                    let _ = tx.send(AppEvent::Log {
+                        level: LogLevel::Error,
+                        message: format!("auto-forward failed for :{rport}: {e}"),
+                    });
+                }
+            }
+        }
+
+        // -----------------------------------------------------------------
+        // Tear down forwards that stopped listening
+        // -----------------------------------------------------------------
         let active: Vec<u16> = manager.active_remote_ports().collect();
         for rport in active {
             if !remote_listening.contains(&rport) {
@@ -320,12 +404,6 @@ async fn run_poll_loop(
                 let _ = tx.send(AppEvent::ForwardStopped {
                     remote_port: rport,
                     reason: "remote port no longer listening".into(),
-                });
-            } else if !configured_ports.contains(&rport) {
-                manager.stop_forward(rport).await;
-                let _ = tx.send(AppEvent::ForwardStopped {
-                    remote_port: rport,
-                    reason: "removed from config".into(),
                 });
             }
         }

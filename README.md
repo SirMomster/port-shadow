@@ -22,8 +22,10 @@ SSH port-forwarding daemon that mirrors VSCode's "Ports" panel. It polls a remot
 ## How it works
 
 1. You pre-establish an SSH master connection to your remote host.
-2. You declare which ports to forward in `.port-shadow.toml` in your project directory.
-3. `port-shadow` polls the remote every N seconds (default: 5). When a configured port starts listening, it spawns `ssh -L` reusing the master socket. When it stops, the tunnel is torn down.
+2. You declare which ports to forward in `.port-shadow.toml` in your project directory (optional).
+3. `port-shadow` polls the remote every N seconds (default: 5).
+   - **Auto-discovery (default):** on the first successful poll the current set of listening ports is recorded as the *baseline*. Any port that appears in a later poll and was not in the baseline is automatically forwarded. When it stops listening the tunnel is torn down.
+   - **Explicit forwards:** ports listed in `[[ports]]` are always forwarded when they appear, regardless of the baseline. Use these when you want labels or fixed local ports.
 4. By default, events are printed as plain log lines to stdout. Pass `--tui` to enable the interactive terminal UI, which shows all active and recently stopped forwards plus a live log panel.
 
 Port mapping is 1:1 by default (remote `:3000` → local `:3000`). If the preferred local port is already in use, an ephemeral port is assigned automatically.
@@ -69,7 +71,9 @@ ssh -M -S /tmp/myhost.sock -N -f user@myhost
 
 The `-f` flag backgrounds the process. The socket path (`/tmp/myhost.sock`) is what you pass to `port-shadow`.
 
-**2. Create `.port-shadow.toml` in your project directory**
+**2. Optionally create `.port-shadow.toml` in your project directory**
+
+Without a config file, `port-shadow` will auto-discover new ports. With a config file you can add labels, pin local ports, and exclude specific ports.
 
 ```toml
 [ssh]
