@@ -103,12 +103,11 @@ impl ForwardManager {
 
         args.push(host.into());
 
-        // Run `cat` on the remote as a no-op blocking command. This keeps the
-        // SSH session alive for as long as we hold the process. Using `-N`
-        // (no command) exits immediately when the connection is multiplexed
-        // over an existing ControlPath master because there is nothing to keep
-        // the slave session open.
-        args.push("cat".into());
+        // Run `sleep infinity` on the remote to keep the session (and therefore
+        // the -L tunnel) open. `cat` was used previously but exits immediately
+        // when stdin is /dev/null (EOF). `sleep infinity` blocks without
+        // consuming any resources.
+        args.push("sleep infinity".into());
 
         tracing::debug!(
             remote_port,
