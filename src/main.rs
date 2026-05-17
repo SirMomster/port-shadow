@@ -49,10 +49,7 @@ async fn main() -> anyhow::Result<()> {
                 .init();
         }
     } else {
-        fmt()
-            .with_env_filter(filter)
-            .with_target(false)
-            .init();
+        fmt().with_env_filter(filter).with_target(false).init();
     }
 
     // ------------------------------------------------------------------

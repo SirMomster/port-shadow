@@ -165,20 +165,25 @@ impl ForwardManager {
         for (port, fwd) in self.active.iter_mut() {
             match fwd.process.try_wait() {
                 Ok(Some(status)) => {
-                        tracing::warn!(
-                            remote_port = port,
-                            local_port = fwd.local_port,
-                            exit_status = %status,
-                            "ssh -L process exited unexpectedly"
-                        );
-                        // Capture any stderr output to aid diagnosis
-                        if let Some(mut stderr) = fwd.process.stderr.take() {
-                            use tokio::io::AsyncReadExt;
-                            let mut buf = String::new();
-                            if stderr.read_to_string(&mut buf).await.is_ok() && !buf.trim().is_empty() {
-                                tracing::warn!(remote_port = port, stderr = buf.trim(), "ssh -L stderr");
-                            }
-                        }                    dead.push(*port);
+                    tracing::warn!(
+                        remote_port = port,
+                        local_port = fwd.local_port,
+                        exit_status = %status,
+                        "ssh -L process exited unexpectedly"
+                    );
+                    // Capture any stderr output to aid diagnosis
+                    if let Some(mut stderr) = fwd.process.stderr.take() {
+                        use tokio::io::AsyncReadExt;
+                        let mut buf = String::new();
+                        if stderr.read_to_string(&mut buf).await.is_ok() && !buf.trim().is_empty() {
+                            tracing::warn!(
+                                remote_port = port,
+                                stderr = buf.trim(),
+                                "ssh -L stderr"
+                            );
+                        }
+                    }
+                    dead.push(*port);
                 }
                 Ok(None) => {} // still running
                 Err(e) => {
