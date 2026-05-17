@@ -68,9 +68,6 @@ impl ForwardManager {
     ) -> anyhow::Result<()> {
         let mut args: Vec<String> = Vec::new();
 
-        // Don't allocate a terminal, run in background
-        args.push("-N".into());
-
         // Batch mode
         args.push("-o".into());
         args.push("BatchMode=yes".into());
@@ -111,6 +108,13 @@ impl ForwardManager {
         args.push(format!("{local_port}:localhost:{remote_port}"));
 
         args.push(host.into());
+
+        // Run `cat` on the remote as a no-op blocking command. This keeps the
+        // SSH session alive for as long as we hold the process. Using `-N`
+        // (no command) exits immediately when the connection is multiplexed
+        // over an existing ControlPath master because there is nothing to keep
+        // the slave session open.
+        args.push("cat".into());
 
         tracing::debug!(
             remote_port,
