@@ -72,10 +72,7 @@ pub async fn run_remote_command(
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!(
-            "ssh command exited with {}: {stderr}",
-            output.status
-        );
+        anyhow::bail!("ssh command exited with {}: {stderr}", output.status);
     }
 
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())

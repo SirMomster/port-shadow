@@ -96,9 +96,7 @@ impl AppState {
                 }
                 self.push_log(
                     LogLevel::Info,
-                    format!(
-                        "forward started  :{remote_port} → localhost:{local_port}"
-                    ),
+                    format!("forward started  :{remote_port} → localhost:{local_port}"),
                 );
             }
             AppEvent::ForwardStopped {
@@ -123,8 +121,7 @@ impl AppState {
                 );
             }
             AppEvent::PollOk { discovered } => {
-                self.last_poll =
-                    format!("last poll ok — {discovered} remote port(s) listening");
+                self.last_poll = format!("last poll ok — {discovered} remote port(s) listening");
             }
             AppEvent::PollError { message } => {
                 self.last_poll = format!("poll error: {message}");
@@ -150,8 +147,7 @@ impl AppState {
 
     pub fn on_key(&mut self, code: KeyCode, modifiers: KeyModifiers) {
         match (code, modifiers) {
-            (KeyCode::Char('q'), _)
-            | (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
+            (KeyCode::Char('q'), _) | (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
                 self.should_quit = true;
             }
             (KeyCode::Down | KeyCode::Char('j'), _) => {
@@ -205,9 +201,9 @@ pub fn render(frame: &mut Frame, state: &mut AppState) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(6),          // port table (expands)
-            Constraint::Length(10),      // log panel (fixed height)
-            Constraint::Length(1),       // status bar
+            Constraint::Min(6),     // port table (expands)
+            Constraint::Length(10), // log panel (fixed height)
+            Constraint::Length(1),  // status bar
         ])
         .split(area);
 
@@ -262,11 +258,11 @@ fn render_forwards_table(frame: &mut Frame, state: &mut AppState, area: Rect) {
     let table = Table::new(
         rows,
         [
-            Constraint::Length(13),  // remote
-            Constraint::Length(12),  // local
-            Constraint::Min(20),     // label
-            Constraint::Length(9),   // status
-            Constraint::Length(10),  // uptime
+            Constraint::Length(13), // remote
+            Constraint::Length(12), // local
+            Constraint::Min(20),    // label
+            Constraint::Length(9),  // status
+            Constraint::Length(10), // uptime
         ],
     )
     .header(header)
@@ -274,7 +270,11 @@ fn render_forwards_table(frame: &mut Frame, state: &mut AppState, area: Rect) {
         Block::default()
             .borders(Borders::ALL)
             .title(title)
-            .title_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            .title_style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
     )
     .row_highlight_style(
         Style::default()
@@ -293,9 +293,7 @@ fn render_log_panel(frame: &mut Frame, state: &AppState, area: Rect) {
     let scroll = state.log_scroll as usize;
 
     // We display the last `inner_height` lines, offset by scroll
-    let start = total
-        .saturating_sub(inner_height)
-        .saturating_sub(scroll);
+    let start = total.saturating_sub(inner_height).saturating_sub(scroll);
     let end = total.saturating_sub(scroll);
     let visible = &state.logs[start..end];
 
@@ -309,10 +307,7 @@ fn render_log_panel(frame: &mut Frame, state: &AppState, area: Rect) {
                 LogLevel::Error => ("ERROR", Color::Red),
             };
             Line::from(vec![
-                Span::styled(
-                    format!("{time_str} "),
-                    Style::default().fg(Color::DarkGray),
-                ),
+                Span::styled(format!("{time_str} "), Style::default().fg(Color::DarkGray)),
                 Span::styled(
                     format!("{level_str} "),
                     Style::default()
@@ -400,11 +395,7 @@ pub async fn run_tui(
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         let _ = disable_raw_mode();
-        let _ = execute!(
-            io::stdout(),
-            LeaveAlternateScreen,
-            DisableMouseCapture
-        );
+        let _ = execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture);
         default_hook(info);
     }));
 
@@ -453,10 +444,7 @@ fn format_uptime(d: Duration) -> String {
 }
 
 fn format_time(t: SystemTime) -> String {
-    let secs = t
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
+    let secs = t.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
     let h = (secs % 86400) / 3600;
     let m = (secs % 3600) / 60;
     let s = secs % 60;

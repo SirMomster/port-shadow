@@ -199,10 +199,9 @@ pub async fn resolve_local_port(preferred: u16) -> anyhow::Result<u16> {
     );
 
     // Bind to port 0 to let the OS assign an ephemeral port
-    let listener =
-        tokio::net::TcpListener::bind(("127.0.0.1", 0u16))
-            .await
-            .context("failed to bind to ephemeral port")?;
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0u16))
+        .await
+        .context("failed to bind to ephemeral port")?;
     let addr = listener.local_addr()?;
     // Drop the listener immediately; the port may be reused before ssh -L binds
     // it, but this is the standard approach for ephemeral port selection.

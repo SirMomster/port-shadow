@@ -58,10 +58,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let config_dir = if config_path.is_file() {
-        config_path
-            .parent()
-            .unwrap_or(&config_path)
-            .to_path_buf()
+        config_path.parent().unwrap_or(&config_path).to_path_buf()
     } else {
         config_path.clone()
     };
@@ -83,11 +80,10 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Validate required fields
-    let host = cfg
-        .ssh
-        .host
-        .clone()
-        .context("SSH host is required. Provide --host or set [ssh] host in .port-shadow.toml")?;
+    let host =
+        cfg.ssh.host.clone().context(
+            "SSH host is required. Provide --host or set [ssh] host in .port-shadow.toml",
+        )?;
 
     let control_path = cfg.ssh.control_path.clone();
     let ssh_port = cfg.ssh.port;
