@@ -1,0 +1,41 @@
+[package]
+name = "port-shadow"
+version = "0.1.0"
+edition = "2021"
+description = "SSH port-forwarding daemon that mirrors VSCode's port forwarding behavior"
+license = "MIT"
+
+[[bin]]
+name = "port-shadow"
+path = "src/main.rs"
+
+[dependencies]
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+
+# Config
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Signal handling
+tokio-util = "0.7"
+
+[target.'cfg(unix)'.dependencies]
+# Unix-specific: nothing extra needed, std has what we need
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

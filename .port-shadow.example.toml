@@ -1,0 +1,46 @@
+# .port-shadow.toml
+# Place this file in your project directory and run `port-shadow` from there.
+#
+# All fields in [ssh] can also be overridden via CLI flags or environment
+# variables. Run `port-shadow --help` for details.
+
+[ssh]
+# SSH destination — required (or pass --host on CLI)
+host = "user@myserver.example.com"
+
+# Path to the pre-established SSH master socket (Unix only).
+# Create it with:
+#   ssh -M -S /tmp/myserver.sock -N -f user@myserver.example.com
+control_path = "/tmp/myserver.sock"
+
+# How often to poll for new/removed listening ports (seconds). Default: 5.
+poll_interval_secs = 5
+
+# Remote SSH port. Default: 22.
+# port = 22
+
+# Optional extra SSH arguments (passed verbatim to every ssh invocation).
+# extra_args = ["-i", "~/.ssh/id_ed25519"]
+
+# ── Port mappings ─────────────────────────────────────────────────────────────
+# Only ports listed here will be forwarded (opt-in).
+# remote_port is required. local_port is optional (defaults to same as
+# remote_port, falling back to an ephemeral port if occupied).
+
+[[ports]]
+remote_port = 3000
+label = "web dev server"
+
+[[ports]]
+remote_port = 5432
+local_port = 5432
+label = "postgres"
+
+[[ports]]
+remote_port = 8080
+# local_port omitted → uses 8080, or ephemeral if 8080 is busy locally
+label = "app server"
+
+# ── Exclusions ────────────────────────────────────────────────────────────────
+# Ports that are NEVER forwarded. Defaults to [22] if not specified.
+excluded_ports = [22]
