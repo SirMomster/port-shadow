@@ -400,6 +400,10 @@ async fn run_poll_loop(
         let active: Vec<u16> = manager.active_remote_ports().collect();
         for rport in active {
             if !remote_listening.contains(&rport) {
+                tracing::info!(
+                    remote_port = rport,
+                    "remote port no longer in listening set, tearing down forward"
+                );
                 manager.stop_forward(rport).await;
                 let _ = tx.send(AppEvent::ForwardStopped {
                     remote_port: rport,
