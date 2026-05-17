@@ -24,7 +24,7 @@ SSH port-forwarding daemon that mirrors VSCode's "Ports" panel. It polls a remot
 1. You pre-establish an SSH master connection to your remote host.
 2. You declare which ports to forward in `.port-shadow.toml` in your project directory.
 3. `port-shadow` polls the remote every N seconds (default: 5). When a configured port starts listening, it spawns `ssh -L` reusing the master socket. When it stops, the tunnel is torn down.
-4. A terminal UI shows all active and recently stopped forwards, plus a live log panel.
+4. By default, events are printed as plain log lines to stdout. Pass `--tui` to enable the interactive terminal UI, which shows all active and recently stopped forwards plus a live log panel.
 
 Port mapping is 1:1 by default (remote `:3000` → local `:3000`). If the preferred local port is already in use, an ephemeral port is assigned automatically.
 
@@ -88,7 +88,8 @@ label = "postgres"
 **3. Run**
 
 ```sh
-port-shadow
+port-shadow          # plain log output to stdout
+port-shadow --tui    # interactive terminal UI
 ```
 
 Press `q` or `Ctrl+C` to quit. All tunnels are torn down on exit.
@@ -141,6 +142,7 @@ Options:
   -p, --ssh-port <SSH_PORT>            Remote SSH port [env: PORT_SHADOW_PORT]
   -c, --config <CONFIG>                Path to config file [env: PORT_SHADOW_CONFIG]
   -v, --verbose...                     Increase log verbosity (-v, -vv, -vvv)
+      --tui                            Enable the terminal user interface
   -h, --help                           Print help
   -V, --version                        Print version
 ```
@@ -148,6 +150,8 @@ Options:
 CLI flags take precedence over config file values. All flags also read from environment variables.
 
 ## TUI keybindings
+
+These apply when running with `--tui`.
 
 | Key | Action |
 |---|---|
@@ -158,7 +162,7 @@ CLI flags take precedence over config file values. All flags also read from envi
 | `PgDn` | Scroll log panel down |
 | `G` | Jump to newest log entries |
 
-Tracing/debug output is written to `port-shadow.log` in the working directory so it does not interfere with the TUI.
+Tracing/debug output is written to `port-shadow.log` in the working directory when running with `--tui`, so it does not interfere with the UI. Without `--tui`, tracing output goes to stdout.
 
 ## Windows notes
 
