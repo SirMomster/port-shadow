@@ -54,13 +54,12 @@ impl ForwardManager {
     }
 
     /// Starts a new `ssh -L` forward for `remote_port -> local_port`.
-    /// On Unix, reuses the ControlPath master connection.
-    /// On Windows, opens a fresh connection (ControlPath ignored).
+    /// Always opens a direct SSH connection (never through the ControlPath mux)
+    /// so the tunnel lifetime is fully owned by this process.
     pub async fn start_forward(
         &mut self,
         host: &str,
         ssh_port: u16,
-        control_path: Option<&str>,
         extra_args: &[String],
         remote_port: u16,
         local_port: u16,
@@ -84,20 +83,15 @@ impl ForwardManager {
         args.push("-p".into());
         args.push(ssh_port.to_string());
 
-        // ControlPath (Unix only)
+        // Explicitly disable ControlPath multiplexing for forwards.
+        // Using the mux master causes the slave session to be closed when the
+        // master's ControlPersist timeout fires (typically a few seconds),
+        // killing the tunnel. A dedicated connection is fully owned by us and
+        // lives as long as the process.
         #[cfg(unix)]
-        if let Some(cp) = control_path {
+        {
             args.push("-o".into());
-            args.push(format!("ControlPath={cp}"));
-            args.push("-o".into());
-            args.push("ControlMaster=no".into());
-        }
-
-        #[cfg(windows)]
-        if control_path.is_some() {
-            tracing::warn!(
-                "ControlPath is not supported on Windows; using a fresh SSH connection for each forward"
-            );
+            args.push("ControlPath=none".into());
         }
 
         // Extra user-supplied args

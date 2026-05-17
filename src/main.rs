@@ -314,7 +314,6 @@ async fn run_poll_loop(
                 .start_forward(
                     &host,
                     ssh_port,
-                    control_path.as_deref(),
                     &extra_args,
                     rport,
                     local_port,
@@ -367,7 +366,6 @@ async fn run_poll_loop(
                 .start_forward(
                     &host,
                     ssh_port,
-                    control_path.as_deref(),
                     &extra_args,
                     rport,
                     local_port,
