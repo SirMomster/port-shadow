@@ -77,6 +77,12 @@ impl ForwardManager {
         args.push("-o".into());
         args.push("StrictHostKeyChecking=accept-new".into());
 
+        // Keep the connection alive
+        args.push("-o".into());
+        args.push("ServerAliveInterval=10".into());
+        args.push("-o".into());
+        args.push("ServerAliveCountMax=3".into());
+
         // SSH port
         args.push("-p".into());
         args.push(ssh_port.to_string());
